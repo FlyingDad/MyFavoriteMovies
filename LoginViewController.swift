@@ -130,14 +130,15 @@ class LoginViewController: UIViewController {
                 print("Unable to get request token")
                 return
             }
-            
-            print(requestToken)
         
             /* 6. Use the data! */
+            self.appDelegate.requestToken = requestToken
+            self.loginWithToken(self.appDelegate.requestToken!)
         }
 
         /* 7. Start the request */
         task.resume()
+        
     }
     
     private func loginWithToken(requestToken: String) {
@@ -145,11 +146,56 @@ class LoginViewController: UIViewController {
         /* TASK: Login, then get a session id */
         
         /* 1. Set the parameters */
+
+        let methodParameters: [String: String!] = [
+            Constants.TMDBParameterKeys.ApiKey : Constants.TMDBParameterValues.ApiKey,
+            Constants.TMDBParameterKeys.Username : usernameTextField.text,
+            Constants.TMDBParameterKeys.Password : passwordTextField.text,
+            Constants.TMDBParameterKeys.RequestToken : requestToken
+        ]
+        
         /* 2/3. Build the URL, Configure the request */
+        let request = NSURLRequest(URL: appDelegate.tmdbURLFromParameters(methodParameters, withPathExtension: "/authentication/token/validate_with_login"))
+        
         /* 4. Make the request */
+        let task = appDelegate.sharedSession.dataTaskWithRequest(request) { (data, response, error) in
+            
         /* 5. Parse the data */
-        /* 6. Use the data! */
-        /* 7. Start the request */
+            guard (error == nil) else {
+                print("There was an error with your request: \(error)")
+                return
+            }
+            
+            /* GUARD: Did we get a successful 2XX response? */
+            guard let statusCode = (response as? NSHTTPURLResponse)?.statusCode where statusCode >= 200 && statusCode <= 299 else {
+                print("Your request returned a status code other than 2xx!")
+                return
+            }
+            
+            /* GUARD: Was there any data returned? */
+            guard let data = data else {
+                print("No data was returned by the request!")
+                return
+            }
+            
+            let jsonRequestToken: AnyObject!
+            do {
+                jsonRequestToken = try NSJSONSerialization.JSONObjectWithData(data, options: .AllowFragments)
+            } catch {
+                print("Could not parse the data as JSON: '\(data)'")
+                return
+            }
+            
+            guard let successfulLogin = jsonRequestToken[Constants.TMDBResponseKeys.Success] as? Bool where successfulLogin == true else {
+                print("Unable to get request token")
+                return
+            }
+            print("Successful Login with token")
+            self.getSessionID(self.appDelegate.requestToken!)
+            
+        }
+        task.resume()
+        
     }
     
     private func getSessionID(requestToken: String) {
@@ -157,11 +203,59 @@ class LoginViewController: UIViewController {
         /* TASK: Get a session ID, then store it (appDelegate.sessionID) and get the user's id */
         
         /* 1. Set the parameters */
+        
+        let methodParameters: [String: String!] = [
+            Constants.TMDBParameterKeys.ApiKey : Constants.TMDBParameterValues.ApiKey,
+            Constants.TMDBParameterKeys.RequestToken : requestToken
+        ]
+        
         /* 2/3. Build the URL, Configure the request */
+        let request = NSURLRequest(URL: appDelegate.tmdbURLFromParameters(methodParameters, withPathExtension: "/authentication/session/new"))
+        
         /* 4. Make the request */
-        /* 5. Parse the data */
-        /* 6. Use the data! */
-        /* 7. Start the request */
+        let task = appDelegate.sharedSession.dataTaskWithRequest(request) { (data, response, error) in
+            /* 5. Parse the data */
+            guard (error == nil) else {
+                print("There was an error with your request: \(error)")
+                return
+            }
+            
+            /* GUARD: Did we get a successful 2XX response? */
+            guard let statusCode = (response as? NSHTTPURLResponse)?.statusCode where statusCode >= 200 && statusCode <= 299 else {
+                print("Your request returned a status code other than 2xx!")
+                return
+            }
+            
+            /* GUARD: Was there any data returned? */
+            guard let data = data else {
+                print("No data was returned by the request!")
+                return
+            }
+            
+            let jsonSession: AnyObject!
+            do {
+                jsonSession = try NSJSONSerialization.JSONObjectWithData(data, options: .AllowFragments)
+            } catch {
+                print("Could not parse the data as JSON: '\(data)'")
+                return
+            }
+            
+            guard let success = jsonSession[Constants.TMDBResponseKeys.Success] as? Bool where success == true else {
+                print("Unable to get request session")
+                return
+            }
+        
+            guard let sessionID = jsonSession[Constants.TMDBResponseKeys.SessionID] as? String else {
+                print("unable to get session ID")
+                return
+            }
+            
+            self.appDelegate.sessionID = sessionID
+            print("Session ID: \(self.appDelegate.sessionID)")
+            self.getUserID(self.appDelegate.sessionID!)
+        }
+        task.resume()
+
     }
     
     private func getUserID(sessionID: String) {
@@ -169,11 +263,52 @@ class LoginViewController: UIViewController {
         /* TASK: Get the user's ID, then store it (appDelegate.userID) for future use and go to next view! */
         
         /* 1. Set the parameters */
+        let methodParameters: [String: String!] = [
+            Constants.TMDBParameterKeys.ApiKey : Constants.TMDBParameterValues.ApiKey,
+            Constants.TMDBParameterKeys.SessionID : sessionID
+        ]
+        
         /* 2/3. Build the URL, Configure the request */
+        let request = NSURLRequest(URL: appDelegate.tmdbURLFromParameters(methodParameters, withPathExtension: "/account"))
+        
         /* 4. Make the request */
-        /* 5. Parse the data */
-        /* 6. Use the data! */
-        /* 7. Start the request */
+        let task = appDelegate.sharedSession.dataTaskWithRequest(request) { (data, response, error) in
+            /* 5. Parse the data */
+            guard (error == nil) else {
+                print("There was an error with your request: \(error)")
+                return
+            }
+            
+            /* GUARD: Did we get a successful 2XX response? */
+            guard let statusCode = (response as? NSHTTPURLResponse)?.statusCode where statusCode >= 200 && statusCode <= 299 else {
+                print("Your request returned a status code other than 2xx!")
+                return
+            }
+            
+            /* GUARD: Was there any data returned? */
+            guard let data = data else {
+                print("No data was returned by the request!")
+                return
+            }
+            
+            let jsonAccount: AnyObject!
+            do {
+                jsonAccount = try NSJSONSerialization.JSONObjectWithData(data, options: .AllowFragments)
+            } catch {
+                print("Could not parse the user data as JSON: '\(data)'")
+                return
+            }
+            
+            guard let userID = jsonAccount[Constants.TMDBResponseKeys.UserID] as? Int else {
+                print("unable to get USER ID")
+                return
+            }
+            
+            self.appDelegate.userID = userID
+            //print("USER ID: \(self.appDelegate.userID)")
+            self.completeLogin()
+        }
+        task.resume()
     }
 }
 
